@@ -217,8 +217,8 @@ if __name__=="__main__":
         print str(cropsize)
         cropped_out = cv.CloneMat(cv.GetSubRect(output,(cropsize[0],cropsize[1],cropsize[2],cropsize[3])))
         intermediate_frames.append(cropped_out)
-        cv.SaveImage("intermediate_%04d.bmp"%d, output)
-        cv.SaveImage("intermediate_%04d.bmp"%(2*steps - d ), output)
+        cv.SaveImage("intermediate_%04d.bmp"%d, cropped_out)
+        cv.SaveImage("intermediate_%04d.bmp"%(2*steps - d ), cropped_out)
 
 
 
