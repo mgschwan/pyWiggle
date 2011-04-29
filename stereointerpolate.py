@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import cv
 import sys
 from optparse import OptionParser
@@ -71,16 +72,23 @@ def parseCommandLine(argv):
     parser.add_option("-c","--crop", action="store", type="string", 
             dest="crop", help="crop the image (x,y,w,h)",
             default = "-1,-1,-1,-1")
-    
+    parser.add_option("-p","--imageshift", action="store", type="string", 
+            dest="imageshift", help="shift the right image (x,y)",
+            default = "0,0")
     parser.add_option("-S","--steps", action="store", type="int", 
             dest="steps", help="number of interpolation steps",
             default = 20)
+    parser.add_option("-q","--headless", action="store", type="int", 
+            dest="headless", help="without graphical output",
+            default = "0")
+
     
 
 
     (options, args) = parser.parse_args(argv)
 
     arguments = {}
+    arguments["headless"] = options.headless
     arguments["steps"] = options.steps
     arguments["left"] = options.left
     arguments["right"] = options.right
@@ -95,6 +103,10 @@ def parseCommandLine(argv):
     arguments["cropy"] = int(cfields[1])
     arguments["cropw"] = int(cfields[2])
     arguments["croph"] = int(cfields[3])
+
+    pfields = options.imageshift.split(",")
+    arguments["imageshiftx"] = int(pfields[0])
+    arguments["imageshifty"] = int(pfields[1])
 
 
     mfields = options.maxrange.split(",")
@@ -125,9 +137,12 @@ if __name__=="__main__":
     right = None
     left_orig = None     #The original images
     right_orig = None    #they may be color images
+
     cropsize = [cmdline["cropx"],cmdline["cropy"],cmdline["cropw"],cmdline["croph"]]
-
-
+   
+    imageshift_x=cmdline["imageshiftx"] 
+    imageshift_y=cmdline["imageshifty"] 
+    
     if cmdline["extract"] == 1:
         tmp = cv.LoadImageM(cmdline["left"], cv.CV_LOAD_IMAGE_GRAYSCALE)
         left = cv.GetSubRect(tmp, (0,0,int(tmp.cols/2), tmp.rows))
@@ -135,7 +150,6 @@ if __name__=="__main__":
         tmp_orig = cv.LoadImageM(cmdline["left"], cv.CV_LOAD_IMAGE_UNCHANGED)
         left_orig = cv.GetSubRect(tmp_orig, (0,0,int(tmp.cols/2), tmp.rows))
         right_orig = cv.GetSubRect(tmp_orig, (int(tmp.cols/2),0,int(tmp.cols/2), tmp.rows))
-
     elif cmdline["extract"] == 2:
         tmp = cv.LoadImageM(cmdline["left"], cv.CV_LOAD_IMAGE_GRAYSCALE)
         left = cv.GetSubRect(tmp, (0,0,tmp.cols, int(tmp.rows/2)))
@@ -149,6 +163,22 @@ if __name__=="__main__":
         right = cv.LoadImageM(cmdline["right"], cv.CV_LOAD_IMAGE_GRAYSCALE)
         left_orig = cv.LoadImageM(cmdline["left"], cv.CV_LOAD_IMAGE_UNCHANGED)
         right_orig = cv.LoadImageM(cmdline["right"], cv.CV_LOAD_IMAGE_UNCHANGED)
+
+
+    # Handle the image shift
+    left_size = (0,0,left.cols-imageshift_x, left.rows-imageshift_y)
+    right_size = (imageshift_x,imageshift_y,right.cols-imageshift_x, right.rows-imageshift_y)
+
+    tmp = left
+    left = cv.GetSubRect(tmp, left_size)
+    tmp = right
+    right = cv.GetSubRect(tmp, right_size)
+
+    tmp = left_orig
+    left_orig = cv.GetSubRect(tmp, left_size)
+    tmp = right_orig
+    right_orig = cv.GetSubRect(tmp, right_size)
+
 
     if cropsize[2] < 0:
         cropsize = [0,0,left.cols,left.rows]
@@ -221,16 +251,16 @@ if __name__=="__main__":
         cv.SaveImage("intermediate_%04d.bmp"%(2*steps - d ), cropped_out)
 
 
+    if not cmdline["headless"] == 1:
+        running=True
+        direction=1
+        pos = 0
+        while running:
+            pos = pos + direction
 
-    running=True
-    direction=1
-    pos = 0
-    while running:
-        pos = pos + direction
+            if pos >= len(intermediate_frames)-1 or pos <= 0:
+                direction = direction * (-1)
 
-        if pos >= len(intermediate_frames)-1 or pos <= 0:
-            direction = direction * (-1)
-
-        cv.ShowImage("Output", intermediate_frames[pos])
-        cv.ShowImage("Flow", flow_frames[pos])
-        cv.WaitKey(20)
+            cv.ShowImage("Output", intermediate_frames[pos])
+            cv.ShowImage("Flow", flow_frames[pos])
+            cv.WaitKey(20)

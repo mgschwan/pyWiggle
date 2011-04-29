@@ -1,3 +1,20 @@
-Example call:
+##########################################
+# Example call:
+##########################################
 
 python stereointerpolate.py  -l images/bambi1.bmp -r images/bambi2.bmp -m 26,1 -b 17,17 -s 5,3 -S 10 -c 32,0,436,333 -f 5
+
+
+##########################################
+# Advanced call with different pivot point
+##########################################
+
+python stereointerpolate.py  -l images/L_small.jpg -r images/R_small.jpg -m 26,1 -b 13,13 -s 5,3 -S 10  -f 5 -p 13,0 --crop 15,15,450,359
+
+
+##########################################
+# Without graphical output
+##########################################
+
+
+python stereointerpolate.py  -l images/L_small.jpg -r images/R_small.jpg -m 26,1 -b 13,13 -s 5,3 -S 10  -f 5 -p 13,0 --crop 15,15,450,359 -q 1
