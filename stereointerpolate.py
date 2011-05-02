@@ -4,9 +4,6 @@ import sys
 from optparse import OptionParser
 
 
-
-
-
 # Creates a x/y velocity field on the interval [0,1]
 def createVelocityField(velx , vely, delta):
     new_velx = cv.CreateMat(velx.rows, velx.cols, cv.CV_32FC1)
@@ -17,6 +14,7 @@ def createVelocityField(velx , vely, delta):
             new_vely[y,x] = vely[y,x] * delta
 
     return (new_velx, new_vely)
+
 
 #Apply a simple median Filter to each component of the velocity field
 #This function is really slow !!
@@ -87,7 +85,12 @@ def parseCommandLine(argv):
     parser.add_option("-F","--composite_file", action="store", type="string",
             dest="composite_file", help="write a pikupiku composite file",
             default = None)
-    
+    parser.add_option("-P","--subpixel", action="store", type="int",
+            dest="subpixel", help="use subpixel blocks",
+            default = 0)
+    parser.add_option("-G","--smooth", action="store", type="int",
+            dest="smooth", help="Gaussian smoothing",
+            default = 0)
 
 
     (options, args) = parser.parse_args(argv)
@@ -110,6 +113,12 @@ def parseCommandLine(argv):
     arguments["cropw"] = int(cfields[2])
     arguments["croph"] = int(cfields[3])
 
+    arguments["smooth"] = options.smooth
+
+    arguments["subpixel"] = False
+    if options.subpixel == 1:
+        arguments["subpixel"] = True
+            
     pfields = options.imageshift.split(",")
     arguments["imageshiftx"] = int(pfields[0])
     arguments["imageshifty"] = int(pfields[1])
@@ -239,8 +248,12 @@ if __name__=="__main__":
     if output_mode == "composite":
         out_composite_image = cv.CreateMat(cropsize[3], (steps+1)*cropsize[2], left_orig.type)
 
+#    print str(cropsize)
+
+
     for d in range (0, steps+1):
-        print "Frame: %d"%d
+        base_progress = float(d)/float(steps+1)
+#        print "%.2f %%"%(100.0*base_progress)
         dst = cv.CreateMat(left.rows, left.cols, cv.CV_8UC1)
         output = cv.CloneMat(left_orig)
 
@@ -250,9 +263,21 @@ if __name__=="__main__":
         (new_velx, new_vely) = createVelocityField(velx,vely,float(d)/steps)
 
 
+        index = 0
+
+        block = cv.CreateMat(bsize[1], bsize[0], left_orig.type)
+        block1 = cv.CreateMat(bsize[1], bsize[0], left_orig.type)
+        block2 = cv.CreateMat(bsize[1], bsize[0], left_orig.type)
+
+#        block_orig = cv.CreateMat(block[1], block[0], left_orig.type)
+
         for x in range (0, new_velx.cols):
             for y in range (0, new_velx.rows):
                 
+                if index%100 == 0:
+                    print "%.2f %%"%(100.0* (base_progress + float(index)/(float(new_velx.cols)*float(new_velx.rows)*float(steps+1))) )
+                index = index +1
+
 
                 xpos = x*shiftsize[0] + bsize[0]/2        
                 ypos = y*shiftsize[1] + bsize[1]/2        
@@ -262,23 +287,48 @@ if __name__=="__main__":
                 xfinalPos = xpos + velx[y,x]
                 yfinalPos = ypos + vely[y,x]
 
+                x_subpixel = xtpos - float(int(xtpos))
                 try:
                     cv.Line(dst, (int(xpos), int(ypos)), (int(xtpos), int(ytpos)), (255,0,0),1)
-                    if xpos - bsize[0]/2 > 0 and xpos + bsize[0]/2 < left_orig.cols and \
+                    if xpos - bsize[0]/2 > 0 and xpos + bsize[0]/2 < left_orig.cols-1 and \
                        ypos- bsize[1]/2 > 0 and ypos + bsize[1]/2 < left_orig.rows and \
-                       xfinalPos - bsize[0]/2 > 0 and xfinalPos + bsize[0]/2 < right_orig.cols and \
-                       yfinalPos- bsize[1]/2 > 0 and yfinalPos + bsize[1]/2 < right_orig.rows:
+                       xfinalPos - bsize[0]/2 > 0 and xfinalPos + bsize[0]/2 < right_orig.cols-1 and \
+                       yfinalPos- bsize[1]/2 > 0 and yfinalPos + bsize[1]/2 < right_orig.rows-1:
+
+
                         tmpMatLeft = cv.GetSubRect(left_orig, (xpos - bsize[0]/2, ypos- bsize[1]/2,bsize[0],bsize[1]))    
                         tmpMatRight = cv.GetSubRect(right_orig, (xfinalPos - bsize[0]/2, yfinalPos- bsize[1]/2,bsize[0],bsize[1]))    
-                        tmpOutput = cv.GetSubRect(output, (int(xtpos) - bsize[0]/2, int(ytpos)- bsize[1]/2,bsize[0],bsize[1]))        
-                        cv.AddWeighted(tmpMatLeft, 1.0 - (float(d)/float(steps)), tmpMatRight, (float(d)/float(steps)), 0.0, tmpOutput) 
+
+
+                        if cmdline["subpixel"]:
+                            tmpMatLeft1 = cv.GetSubRect(left_orig, (1+xpos - bsize[0]/2, ypos- bsize[1]/2,bsize[0],bsize[1]))    
+                            tmpMatRight1 = cv.GetSubRect(right_orig, (1+xfinalPos - bsize[0]/2, yfinalPos- bsize[1]/2,bsize[0],bsize[1]))    
+
+                            tmpOutput = cv.GetSubRect(output, (int(xtpos) - bsize[0]/2, int(ytpos)- bsize[1]/2,bsize[0],bsize[1]))        
+
+                            cv.AddWeighted(tmpMatLeft, 1.0 - (float(d)/float(steps)), tmpMatRight, (float(d)/float(steps)), 0.0, block) 
+                            cv.AddWeighted(tmpMatLeft1, 1.0 - (float(d)/float(steps)), tmpMatRight1, (float(d)/float(steps)), 0.0, block1) 
+            
+                            #The destination block is positioned with subpixel accuracy, thats
+                            #why the weighting of the source blocks has to be inverted
+                            # x_subpixel, 1-x_subpixel instead of 1-x_subpixel, x_subpixel
+                            cv.AddWeighted(block, x_subpixel , block1, 1.0-x_subpixel, 0.0, block2) 
+                            cv.Copy(block2, tmpOutput) 
+                        else:
+                            tmpOutput = cv.GetSubRect(output, (int(xtpos) - bsize[0]/2, int(ytpos)- bsize[1]/2,bsize[0],bsize[1]))        
+                            cv.AddWeighted(tmpMatLeft, 1.0 - (float(d)/float(steps)), tmpMatRight, (float(d)/float(steps)), 0.0, tmpOutput) 
+
+
+
                 except:
                     pass # Invalid position
 
 
         flow_frames.append(dst)
-        print str(cropsize)
         cropped_out = cv.CloneMat(cv.GetSubRect(output,(cropsize[0],cropsize[1],cropsize[2],cropsize[3])))
+        if cmdline["smooth"] > 0:
+            cv.Smooth(cropped_out,cropped_out, cv.CV_GAUSSIAN, cmdline["smooth"] ) # Smooth with Gaussian Kernel
+
         intermediate_frames.append(cropped_out)
         if output_mode == "composite":
             dst = cv.GetSubRect(out_composite_image, (d*cropsize[2],0,cropsize[2],cropsize[3]))

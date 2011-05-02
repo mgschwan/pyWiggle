@@ -18,3 +18,10 @@ python stereointerpolate.py  -l images/L_small.jpg -r images/R_small.jpg -m 26,1
 
 
 python stereointerpolate.py  -l images/L_small.jpg -r images/R_small.jpg -m 26,1 -b 13,13 -s 5,3 -S 10  -f 5 -p 13,0 --crop 15,15,450,359 -q 1
+
+
+##########################################
+# Without subpixel accuracy
+##########################################
+
+./stereointerpolate.py -r images/DSCF0656.LR.jpg -a -m 12,0 -b 7,7 -s 5,3 -f 5 -p 12,0 -S 10 -C 1 -P 1 -F test2_subpix.png
