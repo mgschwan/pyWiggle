@@ -81,7 +81,12 @@ def parseCommandLine(argv):
     parser.add_option("-q","--headless", action="store", type="int", 
             dest="headless", help="without graphical output",
             default = "0")
-
+    parser.add_option("-C","--autocrop", action="store", type="int", 
+            dest="autocrop", help="automatically crop the image",
+            default = "0")
+    parser.add_option("-F","--composite_file", action="store", type="string",
+            dest="composite_file", help="write a pikupiku composite file",
+            default = None)
     
 
 
@@ -92,6 +97,7 @@ def parseCommandLine(argv):
     arguments["steps"] = options.steps
     arguments["left"] = options.left
     arguments["right"] = options.right
+    arguments["autocrop"] = options.autocrop
     arguments["extract"] = 0
     if options.xextract:
         arguments["extract"] = 1
@@ -115,17 +121,24 @@ def parseCommandLine(argv):
     bfields = options.blocksize.split(",")
     arguments["blocksize"] = (int(bfields[0]), int(bfields[1]))
 
+
     sfields = options.shiftsize.split(",")
     arguments["shiftsize"] = (int(sfields[0]), int(sfields[1]))
 
     arguments["filtersize"] = options.filtersize
+    arguments["composite_file"] = options.composite_file
 
     return arguments
     
 
 if __name__=="__main__":
     cmdline = parseCommandLine(sys.argv)
-        
+
+    output_mode = "files"
+    if cmdline["composite_file"] is not None:
+        output_mode = "composite"
+        output_file = cmdline["composite_file"]
+
     bsize = cmdline["blocksize"]
     shiftsize = cmdline["shiftsize"]
     maxrange = cmdline["maxrange"]
@@ -142,28 +155,47 @@ if __name__=="__main__":
    
     imageshift_x=cmdline["imageshiftx"] 
     imageshift_y=cmdline["imageshifty"] 
-    
+    swap_lr=False    
+
     if cmdline["extract"] == 1:
-        tmp = cv.LoadImageM(cmdline["left"], cv.CV_LOAD_IMAGE_GRAYSCALE)
+        image_filename = cmdline["left"]
+        if cmdline["left"] is None and cmdline["right"] is not None:
+            image_filename = cmdline["right"]
+            swap_lr=True
+        tmp = cv.LoadImageM(image_filename, cv.CV_LOAD_IMAGE_GRAYSCALE)
         left = cv.GetSubRect(tmp, (0,0,int(tmp.cols/2), tmp.rows))
         right = cv.GetSubRect(tmp, (int(tmp.cols/2),0,int(tmp.cols/2), tmp.rows))
-        tmp_orig = cv.LoadImageM(cmdline["left"], cv.CV_LOAD_IMAGE_UNCHANGED)
+        tmp_orig = cv.LoadImageM(image_filename, cv.CV_LOAD_IMAGE_UNCHANGED)
         left_orig = cv.GetSubRect(tmp_orig, (0,0,int(tmp.cols/2), tmp.rows))
         right_orig = cv.GetSubRect(tmp_orig, (int(tmp.cols/2),0,int(tmp.cols/2), tmp.rows))
+        
+
     elif cmdline["extract"] == 2:
-        tmp = cv.LoadImageM(cmdline["left"], cv.CV_LOAD_IMAGE_GRAYSCALE)
+        image_filename = cmdline["left"]
+        if cmdline["left"] is None and cmdline["right"] is not None:
+            image_filename = cmdline["right"]
+            swap_lr = True
+        tmp = cv.LoadImageM(image_filename, cv.CV_LOAD_IMAGE_GRAYSCALE)
         left = cv.GetSubRect(tmp, (0,0,tmp.cols, int(tmp.rows/2)))
         right = cv.GetSubRect(tmp, (0,int(tmp.rows/2),tmp.cols, int(tmp.rows/2)))
-        tmp_orig = cv.LoadImageM(cmdline["left"], cv.CV_LOAD_IMAGE_UNCHANGED)
+        tmp_orig = cv.LoadImageM(image_filename, cv.CV_LOAD_IMAGE_UNCHANGED)
         left_orig = cv.GetSubRect(tmp, (0,0,tmp.cols, int(tmp.rows/2)))
         right_orig = cv.GetSubRect(tmp, (0,int(tmp.rows/2),tmp.cols, int(tmp.rows/2)))
-
+        
     else:
         left = cv.LoadImageM(cmdline["left"], cv.CV_LOAD_IMAGE_GRAYSCALE)
         right = cv.LoadImageM(cmdline["right"], cv.CV_LOAD_IMAGE_GRAYSCALE)
         left_orig = cv.LoadImageM(cmdline["left"], cv.CV_LOAD_IMAGE_UNCHANGED)
         right_orig = cv.LoadImageM(cmdline["right"], cv.CV_LOAD_IMAGE_UNCHANGED)
 
+    # Swap the left and right image
+    if swap_lr:
+            tmp_im = left
+            left = right
+            right=tmp_im
+            tmp_im = left_orig
+            left_orig = right_orig
+            right_orig=tmp_im
 
     # Handle the image shift
     left_size = (0,0,left.cols-imageshift_x, left.rows-imageshift_y)
@@ -181,20 +213,18 @@ if __name__=="__main__":
 
 
     if cropsize[2] < 0:
-        cropsize = [0,0,left.cols,left.rows]
+        if cmdline["autocrop"] == 1:
+            cropsize = [2*bsize[0],2*bsize[1],left.cols-2*bsize[0],left.rows-2*bsize[1]]
+        else:
+            cropsize = [0,0,left.cols,left.rows]
 
 
     velx = cv.CreateMat((left.rows-bsize[1])/shiftsize[1],(left.cols-bsize[0])/shiftsize[0], cv.CV_32FC1)
     vely = cv.CreateMat((left.rows-bsize[1])/shiftsize[1],(left.cols-bsize[0])/shiftsize[0], cv.CV_32FC1)
 
-#    velx = cv.CreateMat(left.rows,left.cols, cv.CV_32FC1)
-#    vely = cv.CreateMat(left.rows,left.cols, cv.CV_32FC1)
-
     cv.Zero(velx)
     cv.Zero(vely)
     cv.CalcOpticalFlowBM(left,right,bsize, shiftsize, maxrange, False, velx, vely)
-#    cv.CalcOpticalFlowHS(left,right,False, velx, vely, 1.0, (cv.CV_TERMCRIT_ITER | cv.CV_TERMCRIT_EPS, 10, 0.01))
-#    cv.CalcOpticalFlowLK(left,right,bsize, velx, vely)
 
 
     if filtersize > 0:
@@ -206,6 +236,9 @@ if __name__=="__main__":
 
     intermediate_frames = []
     flow_frames = []
+    if output_mode == "composite":
+        out_composite_image = cv.CreateMat(cropsize[3], (steps+1)*cropsize[2], left_orig.type)
+
     for d in range (0, steps+1):
         print "Frame: %d"%d
         dst = cv.CreateMat(left.rows, left.cols, cv.CV_8UC1)
@@ -247,9 +280,16 @@ if __name__=="__main__":
         print str(cropsize)
         cropped_out = cv.CloneMat(cv.GetSubRect(output,(cropsize[0],cropsize[1],cropsize[2],cropsize[3])))
         intermediate_frames.append(cropped_out)
-        cv.SaveImage("intermediate_%04d.bmp"%d, cropped_out)
-        cv.SaveImage("intermediate_%04d.bmp"%(2*steps - d ), cropped_out)
+        if output_mode == "composite":
+            dst = cv.GetSubRect(out_composite_image, (d*cropsize[2],0,cropsize[2],cropsize[3]))
+            cv.Copy(cropped_out, dst)
+        else:
+            cv.SaveImage("intermediate_%04d.bmp"%d, cropped_out)
+            cv.SaveImage("intermediate_%04d.bmp"%(2*steps - d), cropped_out)
 
+
+    if output_mode == "composite":
+        cv.SaveImage(output_file, out_composite_image)
 
     if not cmdline["headless"] == 1:
         running=True
