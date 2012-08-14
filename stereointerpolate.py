@@ -199,11 +199,11 @@ if __name__=="__main__":
             image_filename = cmdline["right"]
             swap_lr=True
         tmp = cv2.imread(image_filename, cv2.cv.CV_LOAD_IMAGE_GRAYSCALE)
-        left = tmp[:,:int(tmp.cols/2)]
-        right = tmp[:,int(tmp.cols/2):]
+        left = tmp[:,:int(tmp.shape[1]/2)]
+        right = tmp[:,int(tmp.shape[1]/2):]
         tmp_orig = cv2.imread(image_filename, cv2.cv.CV_LOAD_IMAGE_UNCHANGED)
-        left_orig = tmp_orig[:,:int(tmp.cols/2)]
-        right_orig = tmp_orig[:,int(tmp.cols/2):]
+        left_orig = tmp_orig[:,:int(tmp.shape[1]/2)]
+        right_orig = tmp_orig[:,int(tmp.shape[1]/2):]
         
 
     elif cmdline["extract"] == 2:
@@ -212,11 +212,11 @@ if __name__=="__main__":
             image_filename = cmdline["right"]
             swap_lr = True
         tmp = cv2.imread(image_filename, cv2.cv.CV_LOAD_IMAGE_GRAYSCALE)
-        left = tmp[:int(tmp.rows/2),:]
-        right = tmp[int(tmp.rows/2):,:]
+        left = tmp[:int(tmp.shape[0]/2),:]
+        right = tmp[int(tmp.shape[0]/2):,:]
         tmp_orig = cv2.imread(image_filename, cv2.cv.CV_LOAD_IMAGE_UNCHANGED)
-        left_orig = tmp_orig[:int(tmp.rows/2),:]
-        right_orig = tmp_orig[int(tmp.rows/2):,:]
+        left_orig = tmp_orig[:int(tmp.shape[0]/2),:]
+        right_orig = tmp_orig[int(tmp.shape[0]/2):,:]
         
     else:
         left = cv2.imread(cmdline["left"], cv2.cv.CV_LOAD_IMAGE_GRAYSCALE)
