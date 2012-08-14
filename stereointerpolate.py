@@ -43,8 +43,10 @@ def filterVelocityField(velx,vely,kernel_size=3):
     y_cols = vely.shape[1]
 
 
-    new_velx = cv.CreateMat(x_rows, x_cols, cv.CV_32FC1)
-    new_vely = cv.CreateMat(y_rows, y_cols, cv.CV_32FC1)
+    new_velx = numpy.copy(velx)
+    new_velx[:,:] = 0
+    new_vely = numpy.copy(vely)
+    new_vely[:,:] = 0
     
     for x in range (kernel_size//2, x_cols-kernel_size//2):
         for y in range (kernel_size//2, x_rows-kernel_size//2):    
@@ -203,12 +205,12 @@ if __name__=="__main__":
         if cmdline["left"] is None and cmdline["right"] is not None:
             image_filename = cmdline["right"]
             swap_lr=True
-        tmp = cv.LoadImageM(image_filename, cv.CV_LOAD_IMAGE_GRAYSCALE)
-        left = cv.GetSubRect(tmp, (0,0,int(tmp.cols/2), tmp.rows))
-        right = cv.GetSubRect(tmp, (int(tmp.cols/2),0,int(tmp.cols/2), tmp.rows))
-        tmp_orig = cv.LoadImageM(image_filename, cv.CV_LOAD_IMAGE_UNCHANGED)
-        left_orig = cv.GetSubRect(tmp_orig, (0,0,int(tmp.cols/2), tmp.rows))
-        right_orig = cv.GetSubRect(tmp_orig, (int(tmp.cols/2),0,int(tmp.cols/2), tmp.rows))
+        tmp = cv2.imread(image_filename, cv2.cv.CV_LOAD_IMAGE_GRAYSCALE)
+        left = tmp[:,:int(tmp.cols/2)]
+        right = tmp[:,int(tmp.cols/2):]
+        tmp_orig = cv2.imread(image_filename, cv2.cv.CV_LOAD_IMAGE_UNCHANGED)
+        left_orig = tmp_orig[:,:int(tmp.cols/2)]
+        right_orig = tmp_orig[:,int(tmp.cols/2):]
         
 
     elif cmdline["extract"] == 2:
@@ -216,115 +218,106 @@ if __name__=="__main__":
         if cmdline["left"] is None and cmdline["right"] is not None:
             image_filename = cmdline["right"]
             swap_lr = True
-        tmp = cv.LoadImageM(image_filename, cv.CV_LOAD_IMAGE_GRAYSCALE)
-        left = cv.GetSubRect(tmp, (0,0,tmp.cols, int(tmp.rows/2)))
-        right = cv.GetSubRect(tmp, (0,int(tmp.rows/2),tmp.cols, int(tmp.rows/2)))
-        tmp_orig = cv.LoadImageM(image_filename, cv.CV_LOAD_IMAGE_UNCHANGED)
-        left_orig = cv.GetSubRect(tmp, (0,0,tmp.cols, int(tmp.rows/2)))
-        right_orig = cv.GetSubRect(tmp, (0,int(tmp.rows/2),tmp.cols, int(tmp.rows/2)))
+        tmp = cv2.imread(image_filename, cv2.cv.CV_LOAD_IMAGE_GRAYSCALE)
+        left = tmp[:int(tmp.rows/2),:]
+        right = tmp[int(tmp.rows/2):,:]
+        tmp_orig = cv2.imread(image_filename, cv2.cv.CV_LOAD_IMAGE_UNCHANGED)
+        left_orig = tmp_orig[:int(tmp.rows/2),:]
+        right_orig = tmp_orig[int(tmp.rows/2):,:]
         
     else:
-        left = cv.LoadImageM(cmdline["left"], cv.CV_LOAD_IMAGE_GRAYSCALE)
-        right = cv.LoadImageM(cmdline["right"], cv.CV_LOAD_IMAGE_GRAYSCALE)
-        left_orig = cv.LoadImageM(cmdline["left"], cv.CV_LOAD_IMAGE_UNCHANGED)
-        right_orig = cv.LoadImageM(cmdline["right"], cv.CV_LOAD_IMAGE_UNCHANGED)
+        left = cv2.imread(cmdline["left"], cv2.cv.CV_LOAD_IMAGE_GRAYSCALE)
+        right = cv2.imread(cmdline["right"], cv2.cv.CV_LOAD_IMAGE_GRAYSCALE)
+        left_orig = cv2.imread(cmdline["left"], cv2.cv.CV_LOAD_IMAGE_UNCHANGED)
+        right_orig = cv2.imread(cmdline["right"], cv2.cv.CV_LOAD_IMAGE_UNCHANGED)
 
     # Swap the left and right image
     if swap_lr:
-            tmp_im = left
-            left = right
-            right=tmp_im
-            tmp_im = left_orig
-            left_orig = right_orig
-            right_orig=tmp_im
+            left,right = right,left
+            left_orig,right_orig = right_orig,left_orig
+            
+
+    print "%d,%d %d,%d"%(left.shape[1],left.shape[0], right.shape[1],right.shape[0])
 
     # Handle the image shift
-    left_size = (0,0,left.cols-imageshift_x, left.rows-imageshift_y)
-    right_size = (imageshift_x,imageshift_y,right.cols-imageshift_x, right.rows-imageshift_y)
+    left_size = (0,0,left.shape[1]-imageshift_x, left.shape[0]-imageshift_y)
+    right_size = (imageshift_x,imageshift_y,right.shape[1], right.shape[0])
 
-    tmp = left
-    left = cv.GetSubRect(tmp, left_size)
-    tmp = right
-    right = cv.GetSubRect(tmp, right_size)
-
-    tmp = left_orig
-    left_orig = cv.GetSubRect(tmp, left_size)
-    tmp = right_orig
-    right_orig = cv.GetSubRect(tmp, right_size)
+    left = left[left_size[1]:left_size[3], left_size[0]: left_size[2]]
+    right = right[right_size[1]:right_size[3], right_size[0]: right_size[2]] 
+    
+    left_orig = left_orig[left_size[1]:left_size[3], left_size[0]: left_size[2]]
+    right_orig = right_orig[right_size[1]:right_size[3], right_size[0]: right_size[2]] 
 
 
     if cropsize[2] < 0:
         if cmdline["autocrop"] == 1:
-            cropsize = [2*bsize[0],2*bsize[1],left.cols-2*bsize[0],left.rows-2*bsize[1]]
+            cropsize = [2*bsize[0],2*bsize[1],left.shape[1]-2*bsize[0],left.shaoe[0]-2*bsize[1]]
         else:
-            cropsize = [0,0,left.cols,left.rows]
+            cropsize = [0,0,left.shape[1],left.shape[0]]
 
 
-    velx = cv.CreateMat((left.rows-bsize[1])/shiftsize[1],(left.cols-bsize[0])/shiftsize[0], cv.CV_32FC1)
-    vely = cv.CreateMat((left.rows-bsize[1])/shiftsize[1],(left.cols-bsize[0])/shiftsize[0], cv.CV_32FC1)
-
-    cv.Zero(velx)
-    cv.Zero(vely)
-    print "%d,%d %d,%d"%(left.rows,left.cols, right.rows,right.cols)
-    print "%d,%d %d,%d"%(velx.rows,velx.cols, vely.rows,vely.cols)
+   
     
-    left_cv2 = cvToNumpy(left)
-    right_cv2 = cvToNumpy(right)
-    flow = cv2.calcOpticalFlowFarneback(left_cv2, right_cv2, pyr_scale=0.5, levels=3, winsize=bsize[0], iterations=10, poly_n=5, poly_sigma=1.1, flags=cv2.OPTFLOW_FARNEBACK_GAUSSIAN)
+    flow = cv2.calcOpticalFlowFarneback(left, right, pyr_scale=0.5, levels=3, winsize=bsize[0], iterations=10, poly_n=5, poly_sigma=1.1, flags=cv2.OPTFLOW_FARNEBACK_GAUSSIAN)
     velx = flow[:,:,0]
     vely = flow[:,:,1]
     print str(flow)
-    
-    #cv.CalcOpticalFlowBM(left,right,bsize, shiftsize, maxrange, False, velx, vely)
-    
-
 
     if filtersize > 0:
         (tmp_velx, tmp_vely) = filterVelocityField(velx,vely, filtersize)
         velx = tmp_velx
         vely = tmp_vely
 
-
-
     intermediate_frames = []
     flow_frames = []
     if output_mode == "composite":
         out_composite_image = cv.CreateMat(cropsize[3], (steps+1)*cropsize[2], left_orig.type)
 
-#    print str(cropsize)
-
 
     for d in range (0, steps+1):
         base_progress = float(d)/float(steps+1)
 #        print "%.2f %%"%(100.0*base_progress)
-        dst = cv.CreateMat(left.rows, left.cols, cv.CV_8UC1)
-        output = cv.CloneMat(left_orig)
+        dst = numpy.copy(left)
+        dst[:,:] = 0
 
-        cv.AddWeighted(left_orig, 1.0 - (float(d)/float(steps)), right_orig, (float(d)/float(steps)), 0.0, output) 
+        output = (1.0 - (float(d)/float(steps))) * numpy.float32(left_orig) + (float(d)/float(steps)) * numpy.float32(right_orig)
 
-        cv.Zero(dst)
-        (new_velx, new_vely) = createVelocityField(velx,vely,float(d)/steps)
-
+        delta = float(d)/steps
+        new_velx = delta * velx
+        new_vely = delta * vely
+        print str(new_velx)
 
         index = 0
 
-        block = cv.CreateMat(bsize[1], bsize[0], left_orig.type)
-        block1 = cv.CreateMat(bsize[1], bsize[0], left_orig.type)
-        block2 = cv.CreateMat(bsize[1], bsize[0], left_orig.type)
+        #Store all blocks that are moved, to sort them according to their
+        #distance to the camera
+        movements = []
 
-#        block_orig = cv.CreateMat(block[1], block[0], left_orig.type)
+        for x in range (0, new_velx.shape[1],shiftsize[0]):
+            for y in range (0, new_velx.shape[0],shiftsize[1]):
+                xpos = x + bsize[0]/2        
+                ypos = y + bsize[1]/2        
+                
+                xtpos = xpos + new_velx[y,x]
+                ytpos = ypos + new_vely[y,x]
+                xfinalPos = xpos + velx[y,x]
+                yfinalPos = ypos + vely[y,x]
+                movements.append( ( new_velx[y,x]**2+new_vely[y,x]**2, xpos, ypos, xtpos, xtpos, yfinalPos, yfinalPos ) )
 
-        for x in range (0, new_velx.cols):
-            for y in range (0, new_velx.rows):
+
+
+        for x in range (0, new_velx.shape[1],shiftsize[0]):
+            for y in range (0, new_velx.shape[0],shiftsize[1]):
                 
                 if index%100 == 0:
-                    print "%.2f %%"%(100.0* (base_progress + float(index)/(float(new_velx.cols)*float(new_velx.rows)*float(steps+1))) )
+                    print "%.2f %%"%(100.0* (base_progress + float(index)/(float(new_velx.shape[1])*float(new_velx.shape[0])*float(steps+1))) )
                 index = index +1
 
 
-                xpos = x*shiftsize[0] + bsize[0]/2        
-                ypos = y*shiftsize[1] + bsize[1]/2        
-                cv.Circle(dst, (xpos, ypos), 2, (255,255,255), 1)
+                xpos = x + bsize[0]/2        
+                ypos = y + bsize[1]/2        
+                cv2.circle(dst, (xpos, ypos), 2, (255,255,255), 1)
                 xtpos = xpos + new_velx[y,x]
                 ytpos = ypos + new_vely[y,x]
                 xfinalPos = xpos + velx[y,x]
@@ -333,58 +326,60 @@ if __name__=="__main__":
                   x_subpixel = xtpos - float(int(xtpos))
                 except:
                   print "Error: %s (%f,%f) %f"%(str(xtpos), xpos,ypos, new_velx[y,x])
-                try:
-                    cv.Line(dst, (int(xpos), int(ypos)), (int(xtpos), int(ytpos)), (255,0,0),1)
-                    if xpos - bsize[0]/2 > 0 and xpos + bsize[0]/2 < left_orig.cols-1 and \
-                       ypos- bsize[1]/2 > 0 and ypos + bsize[1]/2 < left_orig.rows and \
-                       xfinalPos - bsize[0]/2 > 0 and xfinalPos + bsize[0]/2 < right_orig.cols-1 and \
-                       yfinalPos- bsize[1]/2 > 0 and yfinalPos + bsize[1]/2 < right_orig.rows-1:
+                if True:
+                #try:
+                    cv2.line(dst, (int(xpos), int(ypos)), (int(xtpos), int(ytpos)), (255,0,0),1)
+                    if xpos - bsize[0]/2 > 0 and xpos + bsize[0]/2 < left_orig.shape[1]-1 and \
+                       ypos- bsize[1]/2 > 0 and ypos + bsize[1]/2 < left_orig.shape[0] and \
+                       xfinalPos - bsize[0]/2 > 0 and xfinalPos + bsize[0]/2 < right_orig.shape[1]-1 and \
+                       yfinalPos- bsize[1]/2 > 0 and yfinalPos + bsize[1]/2 < right_orig.shape[0]-1:
 
-
-                        tmpMatLeft = cv.GetSubRect(left_orig, (xpos - bsize[0]/2, ypos- bsize[1]/2,bsize[0],bsize[1]))    
-                        tmpMatRight = cv.GetSubRect(right_orig, (xfinalPos - bsize[0]/2, yfinalPos- bsize[1]/2,bsize[0],bsize[1]))    
-
+                        
+                        tmpMatLeft = left_orig[ypos- bsize[1]/2:ypos+ bsize[1]/2, xpos - bsize[0]/2:xpos + bsize[0]/2]
+                        tmpMatRight = right_orig[yfinalPos- bsize[1]/2:yfinalPos+ bsize[1]/2, xfinalPos - bsize[0]/2:xfinalPos + bsize[0]/2]    
+                
 
                         if cmdline["subpixel"]:
-                            tmpMatLeft1 = cv.GetSubRect(left_orig, (1+xpos - bsize[0]/2, ypos- bsize[1]/2,bsize[0],bsize[1]))    
-                            tmpMatRight1 = cv.GetSubRect(right_orig, (1+xfinalPos - bsize[0]/2, yfinalPos- bsize[1]/2,bsize[0],bsize[1]))    
+                            tmpMatLeft1 = left_orig[ypos- bsize[1]/2:ypos+ bsize[1]/2, 1+xpos - bsize[0]/2:1+xpos + bsize[0]/2 ]
+                            tmpMatRight1 = right_orig[yfinalPos- bsize[1]/2:yfinalPos+ bsize[1]/2, 1+xfinalPos - bsize[0]/2:1+xfinalPos + bsize[0]/2 ]    
 
-                            tmpOutput = cv.GetSubRect(output, (int(xtpos) - bsize[0]/2, int(ytpos)- bsize[1]/2,bsize[0],bsize[1]))        
-
-                            cv.AddWeighted(tmpMatLeft, 1.0 - (float(d)/float(steps)), tmpMatRight, (float(d)/float(steps)), 0.0, block) 
-                            cv.AddWeighted(tmpMatLeft1, 1.0 - (float(d)/float(steps)), tmpMatRight1, (float(d)/float(steps)), 0.0, block1) 
+                            block = cv2.addWeighted(tmpMatLeft, 1.0 - (float(d)/float(steps)), tmpMatRight, (float(d)/float(steps)), 0.0) 
+                            block1 = cv2.addWeighted(tmpMatLeft1, 1.0 - (float(d)/float(steps)), tmpMatRight1, (float(d)/float(steps)), 0.0) 
             
                             #The destination block is positioned with subpixel accuracy, thats
                             #why the weighting of the source blocks has to be inverted
                             # x_subpixel, 1-x_subpixel instead of 1-x_subpixel, x_subpixel
-                            cv.AddWeighted(block, x_subpixel , block1, 1.0-x_subpixel, 0.0, block2) 
-                            cv.Copy(block2, tmpOutput) 
+                            block2 = cv2.addWeighted(block, x_subpixel , block1, 1.0-x_subpixel, 0.0) 
+                            output[int(ytpos)- bsize[1]/2:int(ytpos)+ bsize[1]/2,  int(xtpos) - bsize[0]/2:int(xtpos) + bsize[0]/2] = block2
+                        
                         else:
-                            tmpOutput = cv.GetSubRect(output, (int(xtpos) - bsize[0]/2, int(ytpos)- bsize[1]/2,bsize[0],bsize[1]))        
-                            cv.AddWeighted(tmpMatLeft, 1.0 - (float(d)/float(steps)), tmpMatRight, (float(d)/float(steps)), 0.0, tmpOutput) 
+                            b = cv2.addWeighted(tmpMatLeft, 1.0 - (float(d)/float(steps)), tmpMatRight, (float(d)/float(steps)), 0.0) 
+                            output[int(ytpos)- bsize[1]/2:int(ytpos)+ bsize[1]/2,int(xtpos) - bsize[0]/2:int(xtpos) + bsize[0]/2] = b
+                            
 
 
+                #except:
+                #    pass # Invalid position
 
-                except:
-                    pass # Invalid position
+        cv2.imshow("output", numpy.uint8(output))
+        cv2.waitKey(0)
 
-
+        cv2.imshow("Flow", numpy.uint8(dst))
         flow_frames.append(dst)
-        cropped_out = cv.CloneMat(cv.GetSubRect(output,(cropsize[0],cropsize[1],cropsize[2],cropsize[3])))
+        cropped_out = numpy.copy(output[cropsize[1]:cropsize[3], cropsize[0]:cropsize[2]])
         if cmdline["smooth"] > 0:
-            cv.Smooth(cropped_out,cropped_out, cv.CV_GAUSSIAN, cmdline["smooth"] ) # Smooth with Gaussian Kernel
+            cropped_out = cv2.GaussianBlur( cropped_out, 3, 1)
 
-        intermediate_frames.append(cropped_out)
+        intermediate_frames.append(numpy.uint8(cropped_out))
         if output_mode == "composite":
-            dst = cv.GetSubRect(out_composite_image, (d*cropsize[2],0,cropsize[2],cropsize[3]))
-            cv.Copy(cropped_out, dst)
+            out_composite_image[:, d*cropsize[2]:(d+1)*cropsize[2]] = cropped_out
         else:
-            cv.SaveImage("intermediate_%04d.bmp"%d, cropped_out)
-            cv.SaveImage("intermediate_%04d.bmp"%(2*steps - d), cropped_out)
+            cv2.imwrite("intermediate_%04d.bmp"%d, cropped_out)
+            cv2.imwrite("intermediate_%04d.bmp"%(2*steps - d), cropped_out)
 
 
     if output_mode == "composite":
-        cv.SaveImage(output_file, out_composite_image)
+        cv2.imwrite(output_file, out_composite_image)
 
     if not cmdline["headless"] == 1:
         running=True
@@ -396,6 +391,6 @@ if __name__=="__main__":
             if pos >= len(intermediate_frames)-1 or pos <= 0:
                 direction = direction * (-1)
 
-            cv.ShowImage("Output", intermediate_frames[pos])
-            cv.ShowImage("Flow", flow_frames[pos])
+            cv2.imshow("Output", intermediate_frames[pos])
+            cv2.imshow("Flow", flow_frames[pos])
             cv.WaitKey(20)
