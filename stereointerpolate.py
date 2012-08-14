@@ -1,15 +1,33 @@
 #!/usr/bin/python
-import cv
 import sys
+
+#TODO: REMOVE
+sys.path.insert(0,"/opt/opencv/lib/python2.7/dist-packages/")
+#
+
+
+import numpy
+import cv
+import cv2
 from optparse import OptionParser
 
+def cvToNumpy(mat):
+  im = numpy.zeros((mat.rows,mat.cols), dtype=numpy.uint8)
+  for y in range(mat.rows):
+    for x in range(mat.cols):
+      im[y,x] = mat[y,x]
+  return im
 
 # Creates a x/y velocity field on the interval [0,1]
 def createVelocityField(velx , vely, delta):
-    new_velx = cv.CreateMat(velx.rows, velx.cols, cv.CV_32FC1)
-    new_vely = cv.CreateMat(vely.rows, vely.cols, cv.CV_32FC1)
-    for x in range (0, velx.cols):
-        for y in range (0, velx.rows):    
+    x_rows = velx.shape[0]
+    y_rows = vely.shape[0]
+    x_cols = velx.shape[1]
+    y_cols = vely.shape[1]
+    new_velx = cv.CreateMat(x_rows, x_cols, cv.CV_32FC1)
+    new_vely = cv.CreateMat(y_rows, y_cols, cv.CV_32FC1)
+    for x in range (0, x_cols):
+        for y in range (0, x_rows):    
             new_velx[y,x] = velx[y,x] * delta
             new_vely[y,x] = vely[y,x] * delta
 
@@ -19,27 +37,41 @@ def createVelocityField(velx , vely, delta):
 #Apply a simple median Filter to each component of the velocity field
 #This function is really slow !!
 def filterVelocityField(velx,vely,kernel_size=3):
-    new_velx = cv.CreateMat(velx.rows, velx.cols, cv.CV_32FC1)
-    new_vely = cv.CreateMat(vely.rows, vely.cols, cv.CV_32FC1)
+    x_rows = velx.shape[0]
+    y_rows = vely.shape[0]
+    x_cols = velx.shape[1]
+    y_cols = vely.shape[1]
+
+
+    new_velx = cv.CreateMat(x_rows, x_cols, cv.CV_32FC1)
+    new_vely = cv.CreateMat(y_rows, y_cols, cv.CV_32FC1)
     
-    for x in range (kernel_size//2, velx.cols-kernel_size//2):
-        for y in range (kernel_size//2, velx.rows-kernel_size//2):    
+    for x in range (kernel_size//2, x_cols-kernel_size//2):
+        for y in range (kernel_size//2, x_rows-kernel_size//2):    
             values = []
             for dx in range(kernel_size):
                 for dy in range(kernel_size):
                      values.append(velx[y-kernel_size//2+dy,x-kernel_size//2+dx])
             values.sort()
             new_velx[y,x] = values[len(values)//2]            
-
-    for x in range (kernel_size//2, vely.cols-kernel_size//2):
-        for y in range (kernel_size//2, vely.rows-kernel_size//2):    
+            try:
+              float(new_velx[y,x])
+            except:
+              print "new_velx[%d,%d]"%(y,x)
+        
+    for x in range (kernel_size//2, y_cols-kernel_size//2):
+        for y in range (kernel_size//2, y_rows-kernel_size//2):    
             values = []
             for dx in range(kernel_size):
                 for dy in range(kernel_size):
                      values.append(vely[y-kernel_size//2+dy,x-kernel_size//2+dx])
             values.sort()
-            new_vely[y,x] = values[len(values)//2]            
 
+            new_vely[y,x] = values[len(values)//2]            
+            try:
+              float(new_vely[y,x])      
+            except:
+              print "new_vely[%d,%d]"%(y,x)
     return (new_velx,new_vely)
 
 
@@ -233,7 +265,18 @@ if __name__=="__main__":
 
     cv.Zero(velx)
     cv.Zero(vely)
-    cv.CalcOpticalFlowBM(left,right,bsize, shiftsize, maxrange, False, velx, vely)
+    print "%d,%d %d,%d"%(left.rows,left.cols, right.rows,right.cols)
+    print "%d,%d %d,%d"%(velx.rows,velx.cols, vely.rows,vely.cols)
+    
+    left_cv2 = cvToNumpy(left)
+    right_cv2 = cvToNumpy(right)
+    flow = cv2.calcOpticalFlowFarneback(left_cv2, right_cv2, pyr_scale=0.5, levels=3, winsize=bsize[0], iterations=10, poly_n=5, poly_sigma=1.1, flags=cv2.OPTFLOW_FARNEBACK_GAUSSIAN)
+    velx = flow[:,:,0]
+    vely = flow[:,:,1]
+    print str(flow)
+    
+    #cv.CalcOpticalFlowBM(left,right,bsize, shiftsize, maxrange, False, velx, vely)
+    
 
 
     if filtersize > 0:
@@ -286,8 +329,10 @@ if __name__=="__main__":
                 ytpos = ypos + new_vely[y,x]
                 xfinalPos = xpos + velx[y,x]
                 yfinalPos = ypos + vely[y,x]
-
-                x_subpixel = xtpos - float(int(xtpos))
+                try:
+                  x_subpixel = xtpos - float(int(xtpos))
+                except:
+                  print "Error: %s (%f,%f) %f"%(str(xtpos), xpos,ypos, new_velx[y,x])
                 try:
                     cv.Line(dst, (int(xpos), int(ypos)), (int(xtpos), int(ytpos)), (255,0,0),1)
                     if xpos - bsize[0]/2 > 0 and xpos + bsize[0]/2 < left_orig.cols-1 and \
