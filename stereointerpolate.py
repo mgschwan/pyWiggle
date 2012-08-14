@@ -118,6 +118,9 @@ def parseCommandLine(argv):
     parser.add_option("-G","--smooth", action="store", type="int",
             dest="smooth", help="Gaussian smoothing",
             default = 0)
+    parser.add_option("-B","--bg", action="store", type="int",
+            dest="background", help="Interpolated image in background",
+            default = 1)
 
 
     (options, args) = parser.parse_args(argv)
@@ -128,6 +131,7 @@ def parseCommandLine(argv):
     arguments["left"] = options.left
     arguments["right"] = options.right
     arguments["autocrop"] = options.autocrop
+    arguments["background"] = options.background
     arguments["extract"] = 0
     if options.xextract:
         arguments["extract"] = 1
@@ -180,6 +184,7 @@ if __name__=="__main__":
     maxrange = cmdline["maxrange"]
     steps = cmdline["steps"]
     filtersize = cmdline["filtersize"]
+    drawbg = True if cmdline["background"] else False
 
 
     left = None
@@ -288,8 +293,10 @@ if __name__=="__main__":
 #        print "%.2f %%"%(100.0*base_progress)
         dst = numpy.copy(left)
         dst[:,:] = 0
-
-        output = (1.0 - (float(d)/float(steps))) * numpy.float32(left_orig) + (float(d)/float(steps)) * numpy.float32(right_orig)
+        if drawbg:
+          output = (1.0 - (float(d)/float(steps))) * numpy.float32(left_orig) + (float(d)/float(steps)) * numpy.float32(right_orig)
+        else:
+          output = numpy.zeros(left_orig.shape, dtype=numpy.float32)
 
         delta = float(d)/steps
         new_velx = delta * velx
@@ -302,13 +309,13 @@ if __name__=="__main__":
 
         for x in range (0, new_velx.shape[1],shiftsize[0]):
             for y in range (0, new_velx.shape[0],shiftsize[1]):
-                xpos = x + bsize[0]/2        
-                ypos = y + bsize[1]/2        
+                xpos = int(x + bsize[0]/2)
+                ypos = int(y + bsize[1]/2)
                 
-                xtpos = xpos + new_velx[y,x]
-                ytpos = ypos + new_vely[y,x]
-                xfinalPos = xpos + velx[y,x]
-                yfinalPos = ypos + vely[y,x]
+                xtpos = int(xpos + new_velx[y,x])
+                ytpos = int(ypos + new_vely[y,x])
+                xfinalPos = int(xpos + velx[y,x])
+                yfinalPos = int(ypos + vely[y,x])
                 """The first element is the x-shift of the block
                    smaller shifts (maybe even negative) belong to
                    objects closer to the camera and have to be drawn last"""
@@ -339,25 +346,25 @@ if __name__=="__main__":
                    xfinalPos - bsize[0]/2 > 0 and xfinalPos + bsize[0]/2 < right_orig.shape[1]-1 and \
                    yfinalPos- bsize[1]/2 > 0 and yfinalPos + bsize[1]/2 < right_orig.shape[0]-1:
                     
-                    tmpMatLeft = left_orig[ypos- bsize[1]/2:ypos+ bsize[1]/2, xpos - bsize[0]/2:xpos + bsize[0]/2]
-                    tmpMatRight = right_orig[yfinalPos- bsize[1]/2:yfinalPos+ bsize[1]/2, xfinalPos - bsize[0]/2:xfinalPos + bsize[0]/2]    
+                   tmpMatLeft = left_orig[ypos- bsize[1]/2:ypos+ bsize[1]/2, xpos - bsize[0]/2:xpos + bsize[0]/2]
+                   tmpMatRight = right_orig[yfinalPos- bsize[1]/2:yfinalPos+ bsize[1]/2, xfinalPos - bsize[0]/2:xfinalPos + bsize[0]/2]    
 
-                    if cmdline["subpixel"]:
-                        tmpMatLeft1 = left_orig[ypos- bsize[1]/2:ypos+ bsize[1]/2, 1+xpos - bsize[0]/2:1+xpos + bsize[0]/2 ]
-                        tmpMatRight1 = right_orig[yfinalPos- bsize[1]/2:yfinalPos+ bsize[1]/2, 1+xfinalPos - bsize[0]/2:1+xfinalPos + bsize[0]/2 ]    
-
-                        block = cv2.addWeighted(tmpMatLeft, 1.0 - (float(d)/float(steps)), tmpMatRight, (float(d)/float(steps)), 0.0) 
-                        block1 = cv2.addWeighted(tmpMatLeft1, 1.0 - (float(d)/float(steps)), tmpMatRight1, (float(d)/float(steps)), 0.0) 
-        
-                        #The destination block is positioned with subpixel accuracy, thats
-                        #why the weighting of the source blocks has to be inverted
-                        # x_subpixel, 1-x_subpixel instead of 1-x_subpixel, x_subpixel
-                        block2 = cv2.addWeighted(block, x_subpixel , block1, 1.0-x_subpixel, 0.0) 
-                        output[int(ytpos)- bsize[1]/2:int(ytpos)+ bsize[1]/2,  int(xtpos) - bsize[0]/2:int(xtpos) + bsize[0]/2] = block2
-                    
-                    else:
-                        b = cv2.addWeighted(tmpMatLeft, 1.0 - (float(d)/float(steps)), tmpMatRight, (float(d)/float(steps)), 0.0) 
-                        output[int(ytpos)- bsize[1]/2:int(ytpos)+ bsize[1]/2,int(xtpos) - bsize[0]/2:int(xtpos) + bsize[0]/2] = b
+                   if cmdline["subpixel"]:
+                       tmpMatLeft1 = left_orig[ypos- bsize[1]/2:ypos+ bsize[1]/2, 1+xpos - bsize[0]/2:1+xpos + bsize[0]/2 ]
+                       tmpMatRight1 = right_orig[yfinalPos- bsize[1]/2:yfinalPos+ bsize[1]/2, 1+xfinalPos - bsize[0]/2:1+xfinalPos + bsize[0]/2 ]    
+                       
+                       block = cv2.addWeighted(tmpMatLeft, 1.0 - (float(d)/float(steps)), tmpMatRight, (float(d)/float(steps)), 0.0) 
+                       block1 = cv2.addWeighted(tmpMatLeft1, 1.0 - (float(d)/float(steps)), tmpMatRight1, (float(d)/float(steps)), 0.0) 
+       
+                       #The destination block is positioned with subpixel accuracy, thats
+                       #why the weighting of the source blocks has to be inverted
+                       # x_subpixel, 1-x_subpixel instead of 1-x_subpixel, x_subpixel
+                       block2 = cv2.addWeighted(block, x_subpixel , block1, 1.0-x_subpixel, 0.0) 
+                       output[int(ytpos)- bsize[1]/2:int(ytpos)+ bsize[1]/2,  int(xtpos) - bsize[0]/2:int(xtpos) + bsize[0]/2] = block2
+                  
+                   else:
+                       b = cv2.addWeighted(tmpMatLeft, 1.0 - (float(d)/float(steps)), tmpMatRight, (float(d)/float(steps)), 0.0) 
+                       output[int(ytpos)- bsize[1]/2:int(ytpos)+ bsize[1]/2,int(xtpos) - bsize[0]/2:int(xtpos) + bsize[0]/2] = b
 
         flow_frames.append(dst)
         cropped_out = numpy.copy(output[cropsize[1]:cropsize[3]+cropsize[1], cropsize[0]:cropsize[2]+cropsize[0]])
