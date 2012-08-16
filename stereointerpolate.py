@@ -27,11 +27,97 @@ def createVelocityField(velx , vely, delta):
     return (new_velx, new_vely)
 
 
-def filterVelocityField(velx,vely,ksize=3):
-    #TODO: Implement the filtering based on block SSD
+"""Extracts a block from an image and takes care of the boundary cases
+   Always returns an image of size (width,height). Non existing parts
+   of the source image are black
+"""
+def safeBlockExtract(image, xpos, ypos, width, height):
+  #from pudb import set_trace; set_trace()
+  shape = list(image.shape)
+  shape[0] = height
+  shape[1] = width
+  block = numpy.zeros(shape)
   
+  xpos = int(xpos)
+  ypos = int(ypos)
+  width = int(width)
+  height = int(height)
+  
+  real_x = min(image.shape[1], 0 if xpos < 0 else xpos)
+  real_y = min(image.shape[0], 0 if ypos < 0 else ypos)
+  
+  corr_x = -min(xpos+real_x, 0)
+  corr_y = -min(ypos+real_y, 0)
+  
+  tmp_x = min (xpos + width, image.shape[1])
+  tmp_y = min (ypos + height, image.shape[0])
+    
+  corr_w = -min((tmp_x-xpos-width), 0)
+  corr_h = -min((tmp_y-ypos-height), 0)
+     
+  real_width = width - corr_x - corr_w
+  real_height = height - corr_y - corr_h
+  
+  if real_width > 0 and real_height > 0:
+    block[corr_y:corr_y+real_height, corr_x:corr_x+real_width] = image[real_y:real_y+real_height, real_x:real_x+real_width]
+  
+  return block
+
+
+"""ULTRASLOW !!!! 
+   use with caution
+"""  
+def filterVelocityField(velx,vely, image1, image2, bsize=16):
     newvelx = numpy.copy(velx)
     newvely = numpy.copy(vely)
+    
+    for y in xrange(velx.shape[0]):
+      for x in xrange(bsize, velx.shape[1]-bsize):
+        
+        vx1 = velx[y,x-bsize]
+        vx2 = velx[y,x]
+        vx3 = velx[y,x+bsize]
+        
+        vy1 = vely[y,x-bsize]
+        vy2 = vely[y,x]
+        vy3 = vely[y,x+bsize]
+        
+        
+        xpos1 = int(x + vx1)
+        xpos2 = int(x + vx2)
+        xpos3 = int(x + vx3)
+        ypos1 = int(y + vy1)
+        ypos2 = int(y + vy2)
+        ypos3 = int(y + vy3)
+
+        srcblock = safeBlockExtract(image1, x-bsize/2,y-bsize/2, bsize,bsize)
+        block1 = safeBlockExtract(image2, xpos1-bsize/2,ypos1-bsize/2, bsize,bsize)
+        block2 = safeBlockExtract(image2, xpos2-bsize/2,ypos2-bsize/2, bsize,bsize)
+        block3 = safeBlockExtract(image2, xpos3-bsize/2,ypos3-bsize/2, bsize,bsize)
+        
+        dist1 = numpy.sum(numpy.abs(block1-srcblock))
+        dist2 = numpy.sum(numpy.abs(block2-srcblock))
+        dist3 = numpy.sum(numpy.abs(block3-srcblock))
+
+        #print "%f %f %f (%f,%f) (%f,%f) (%f,%f)"%(dist1, dist2, dist3, vx1,vy1, vx2,vy2,vx3,vy3)
+
+        
+        vx = vx1
+        vy = vy1
+        
+        if dist2<=dist1:
+          vx = vx2
+          vy = vy2
+
+        if dist3<=dist2 and dist3<=dist1:
+          vx = vx3
+          vy = vy3
+
+        newvelx[y,x] = vx
+        newvely[y,x] = vy
+
+        
+        
   
     return newvelx,newvely
     
@@ -58,7 +144,7 @@ def parseCommandLine(argv):
             dest="shiftsize", help="distance between search windows (x,y)",
             default = "10,10")
     parser.add_option("-f","--filtersize", action="store", type="int", 
-            dest="filtersize", help="size of the median filter",
+            dest="filtersize", help="filterblocksize (warning slow!!)",
             default = "0")
     parser.add_option("-c","--crop", action="store", type="string", 
             dest="crop", help="crop the image (x,y,w,h)",
@@ -216,16 +302,8 @@ if __name__=="__main__":
             cropsize = [2*bsize[0],2*bsize[1],left.shape[1]-2*bsize[0],left.shape[0]-2*bsize[1]]
         else:
             cropsize = [0,0,left.shape[1],left.shape[0]]
-
-
    
-    
-    #flow = numpy.zeros((left.shape[0],left.shape[1], 2), dtype=numpy.float32)
-    #for y in range(flow.shape[0]/maxrange[1]):
-    #  flow[y*maxrange[1]:(y+1)*maxrange[1],:] = cv2.calcOpticalFlowFarneback(left[y*maxrange[1]:(y+1)*maxrange[1],:], right[y*maxrange[1]:(y+1)*maxrange[1],:], pyr_scale=0.5, levels=3, winsize=bsize[0], iterations=10, poly_n=5, poly_sigma=1.1, flags=cv2.OPTFLOW_FARNEBACK_GAUSSIAN)
-    
     flow = cv2.calcOpticalFlowFarneback(left, right, pyr_scale=0.5, levels=3, winsize=bsize[0], iterations=10, poly_n=5, poly_sigma=1.1, flags=cv2.OPTFLOW_FARNEBACK_GAUSSIAN, flow=None)
-    
     
     velx = flow[:,:,0]
     vely = flow[:,:,1]
@@ -239,8 +317,8 @@ if __name__=="__main__":
     vely[vely < -maxrange[1]] = -maxrange[1]
     
     
-    if filtersize > 0:
-        (tmp_velx, tmp_vely) = filterVelocityField(velx,vely, filtersize)
+    if filtersize > 1:
+        (tmp_velx, tmp_vely) = filterVelocityField(velx,vely, left, right, filtersize)
         velx = tmp_velx
         vely = tmp_vely
 
@@ -249,7 +327,7 @@ if __name__=="__main__":
     if output_mode == "composite":
         shape = list(left_orig.shape)
         shape[0] = cropsize[3]
-        shape[1] = (steps+1)*cropsize[2]
+        shape[1] = (2*steps+1)*cropsize[2]
         out_composite_image = numpy.zeros(shape)
 
 
@@ -341,6 +419,7 @@ if __name__=="__main__":
         intermediate_frames.append(numpy.uint8(cropped_out))
         if output_mode == "composite":
             out_composite_image[:,d*cropsize[2]:(d+1)*cropsize[2]] = cropped_out
+            out_composite_image[:,(2*steps-d)*cropsize[2]:(2*steps-d+1)*cropsize[2]] = cropped_out
         else:
             cv2.imwrite("intermediate_%04d.bmp"%d, numpy.uint8(cropped_out))
             cv2.imwrite("intermediate_%04d.bmp"%(2*steps - d), numpy.uint8(cropped_out))

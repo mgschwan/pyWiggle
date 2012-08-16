@@ -2,26 +2,18 @@
 # Example call:
 ##########################################
 
-python stereointerpolate.py  -l images/bambi1.bmp -r images/bambi2.bmp -m 26,1 -b 17,17 -s 5,3 -S 10 -c 32,0,436,333 -f 5
-
-
-##########################################
-# Advanced call with different pivot point
-##########################################
-
-python stereointerpolate.py  -l images/L_small.jpg -r images/R_small.jpg -m 26,1 -b 13,13 -s 5,3 -S 10  -f 5 -p 13,0 --crop 15,15,450,359
+python stereointerpolate.py -r images/bambi1.bmp -l images/bambi2.bmp -m 20,10 -b 11,11 -s 5,5 -f 12 -p 6,0 -S 8 -C 1 -P 1 -F test2_subpix.png -B 1
 
 
 ##########################################
 # Without graphical output
 ##########################################
 
-
-python stereointerpolate.py  -l images/L_small.jpg -r images/R_small.jpg -m 26,1 -b 13,13 -s 5,3 -S 10  -f 5 -p 13,0 --crop 15,15,450,359 -q 1
+python stereointerpolate.py -r images/bambi1.bmp -l images/bambi2.bmp -m 20,10 -b 11,11 -s 5,5 -f 12 -p 6,0 -S 8 -C 1 -P 1 -F test2_subpix.png -B 1 -q 1
 
 
 ##########################################
-# Without subpixel accuracy
+# With subpixel accuracy
 ##########################################
 
-./stereointerpolate.py -r images/DSCF0656.LR.jpg -a -m 12,0 -b 7,7 -s 5,3 -f 5 -p 12,0 -S 10 -C 1 -P 1 -F test2_subpix.png
+python stereointerpolate.py -r images/DSCF0640.LR.jpg  -a -m 20,10 -b 11,11 -s 5,5 -f 12 -p 12,0 -S 8 -C 1 -P 1 -F test2_subpix.png -B 1
