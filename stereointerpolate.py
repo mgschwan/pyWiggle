@@ -27,49 +27,15 @@ def createVelocityField(velx , vely, delta):
     return (new_velx, new_vely)
 
 
-#Apply a simple median Filter to each component of the velocity field
-#This function is really slow !!
-def filterVelocityField(velx,vely,kernel_size=3):
-    x_rows = velx.shape[0]
-    y_rows = vely.shape[0]
-    x_cols = velx.shape[1]
-    y_cols = vely.shape[1]
-
-
-    new_velx = numpy.copy(velx)
-    new_velx[:,:] = 0
-    new_vely = numpy.copy(vely)
-    new_vely[:,:] = 0
+def filterVelocityField(velx,vely,ksize=3):
+    #TODO: Implement the filtering based on block SSD
+  
+    newvelx = numpy.copy(velx)
+    newvely = numpy.copy(vely)
+  
+    return newvelx,newvely
     
-    for x in range (kernel_size//2, x_cols-kernel_size//2):
-        for y in range (kernel_size//2, x_rows-kernel_size//2):    
-            values = []
-            for dx in range(kernel_size):
-                for dy in range(kernel_size):
-                     values.append(velx[y-kernel_size//2+dy,x-kernel_size//2+dx])
-            values.sort()
-            new_velx[y,x] = values[len(values)//2]            
-            try:
-              float(new_velx[y,x])
-            except:
-              print "new_velx[%d,%d]"%(y,x)
-        
-    for x in range (kernel_size//2, y_cols-kernel_size//2):
-        for y in range (kernel_size//2, y_rows-kernel_size//2):    
-            values = []
-            for dx in range(kernel_size):
-                for dy in range(kernel_size):
-                     values.append(vely[y-kernel_size//2+dy,x-kernel_size//2+dx])
-            values.sort()
-
-            new_vely[y,x] = values[len(values)//2]            
-            try:
-              float(new_vely[y,x])      
-            except:
-              print "new_vely[%d,%d]"%(y,x)
-    return (new_velx,new_vely)
-
-
+    
 def parseCommandLine(argv):
     parser = OptionParser()
     parser.add_option("-l","--left", action="store", type="string",
@@ -307,15 +273,16 @@ if __name__=="__main__":
         #distance to the camera
         movements = []
 
-        for x in range (0, new_velx.shape[1],shiftsize[0]):
-            for y in range (0, new_velx.shape[0],shiftsize[1]):
-                xpos = int(x + bsize[0]/2)
-                ypos = int(y + bsize[1]/2)
+        for y in range (bsize[1]/2, new_velx.shape[0],shiftsize[1]):
+          for x in range (bsize[0]/2, new_velx.shape[1],shiftsize[0]):
+            
+                xpos = int(x)
+                ypos = int(y)
                 
-                xtpos = int(xpos + new_velx[y,x])
-                ytpos = int(ypos + new_vely[y,x])
-                xfinalPos = int(xpos + velx[y,x])
-                yfinalPos = int(ypos + vely[y,x])
+                xtpos = xpos + new_velx[y,x]
+                ytpos = ypos + new_vely[y,x]
+                xfinalPos = xpos + velx[y,x]
+                yfinalPos = ypos + vely[y,x]
                 """The first element is the x-shift of the block
                    smaller shifts (maybe even negative) belong to
                    objects closer to the camera and have to be drawn last"""
@@ -331,11 +298,11 @@ if __name__=="__main__":
                 index = index +1
                 xpos = m[1]        
                 ypos = m[2]
-                xtpos = m[3]
-                ytpos = m[4]
-                xfinalPos = m[5]
-                yfinalPos = m[6]
-                x_subpixel = xtpos - float(int(xtpos))
+                xtpos = int(m[3])
+                ytpos = int(m[4])
+                xfinalPos = int(m[5])
+                yfinalPos = int(m[6])
+                x_subpixel = m[3] - float(int(xtpos))
 
 
                 cv2.circle(dst, (xpos, ypos), 2, (255,255,255), 1)
