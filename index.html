@@ -19,39 +19,40 @@
 
         <header>
           <h1>Pywiggle</h1>
-          <h2>A script to perform view interpolation between two stereo views</h2>
+          <h2>A script to perform view interpolation on stereo views</h2>
         </header>
 
 
         <hr>
 
         <section id="main_content">
-        
+			<h3>Introduction</h3>        
+        <p>The program interpolates several views between a left and right image to create a smooth animation between those two views. When the animations are played back the user gets the impression of the scene depth without using glasses or other means of 3D technology. 
+		  </p>
+		  <p>See <a href="http://en.wikipedia.org/wiki/Stereoscopy#Wiggle_stereoscopy">Wiggle stereoscopy (Wikipedia)</a> for more details.</p>
+   	  <p>The quality of the animation depends heavily on the input data. Some scenes may work very well and others may fail completely. Images taken with a stereo rig should work best. Images taken by manually moving the camera will often not produce good results.</p>
+		
+		
+		   <hr>
+		
+			<h3>Download</h3>
+			<p>You will need a recent version of the <a href="http://opencv.org/">OpenCV library</a> and Python.</p>
+			<p>The code can be found <a href="https://github.com/mgschwan/pyWiggle">on github</a></p>
+			<h3>Examples</h3>        
+		   Please note: The animations are rather big and take a while to load.
+			<br/>
+			<br/>
         <a href="wiggle.html?file=./assets/nasa_anim.png&source=./assets/nasa_source.png&width=717&height=578&frames=17">Sun (Nasa)</a><br/>
 Commandline:<br/>
 <pre><code>python stereointerpolate.py -r images/nasa.png  -a -m 20,10 -b 11,11 -s 5,5 -p 3,0 -S 8 -C 1 -P 1 -F test2_subpix.png -B 1</code></pre>
-
-<br/>
-<br/>
 
 <a href="wiggle.html?file=./assets/beach_anim.png&source=./assets/beach_source.png&width=366&height=278&frames=17">Beach</a><br/>
 Commandline:<br/>
 <pre><code>python stereointerpolate.py -r images/DSCF0640.LR.jpg  -a -m 20,10 -b 11,11 -s 5,5 -f 12 -p 12,0 -S 8 -C 1 -P 1 -F test2_subpix.png -B 1</code></pre>
 
-
-<br/>
-<br/>
-
 <a href="wiggle.html?file=./assets/stone_anim.png&source=./assets/stone_source.bmp&width=436&height=353&frames=17">Stone plate</a><br/>
 Commandline:<br/>
 <pre><code>python stereointerpolate.py -l images/stone1.bmp -r images/stone2.bmp  -m 20,10 -b 11,11 -s 5,5 -f 12 -p 12,0 -S 8 -C 1 -P 1 -F test2_subpix.png -B 1 --crop 15,15,436,353</code></pre>
-
-        
-        
-          <h3>Welcome to GitHub Pages.</h3>
-
-<p>This automatic page generator is the easiest way to create beautiful pages for all of your projects. Author your page content here using GitHub Flavored Markdown, select a template crafted by a designer, and publish. After your page is generated, you can check out the new branch:</p>
-
 
         </section>
 
